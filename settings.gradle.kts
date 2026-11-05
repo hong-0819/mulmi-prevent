@@ -19,6 +19,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // [2단계 추가] Pleos Connect SDK 다운로드용 공식 Maven 저장소
+        maven {
+            url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/")
+        }
     }
 }
 
