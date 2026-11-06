@@ -52,4 +52,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // 차량의 깜빡이 등 상태 정보를 읽기 위한 Pleos 공식 SDK
+    implementation("ai.pleos.playground:Vehicle:2.3.2")
 }
