@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 class MainActivity : ComponentActivity() {
@@ -48,7 +49,7 @@ fun Screen(lifecycle: Lifecycle) {
 
     // 쏠림 정도: -1 = 완전 왼쪽, 0 = 가운데, +1 = 완전 오른쪽
     var target by remember { mutableFloatStateOf(0f) }
-    val strength = 0.6f   // 방향 애니메이션 목표값. 실제 음량은 아래에서 80%/20%로 계산.
+    val strength = 0.6f   // 방향 애니메이션 목표값. 실제 음량은 아래에서 70%/30%로 계산.
 
     // 자동 모드에서는 실제 콘솔 깜빡이를 사용한다. 수동 모드는 기존 버튼 테스트용이다.
     // 두 입력이 서로 덮어쓰지 않도록 한 번에 한 모드만 음량을 결정한다.
@@ -60,11 +61,13 @@ fun Screen(lifecycle: Lifecycle) {
     val naviClient = remember { PleosNaviClient(context.applicationContext) }
     var cue by remember { mutableStateOf(TurnCue.IDLE) }
     var naviMessage by remember { mutableStateOf("내비 대기") }
+    // [테스트용] 에뮬레이터에서 차가 안 움직이므로 남은 거리를 앱 안에서 줄인다 (DrivingSimulator.kt)
+    var simulateDriving by remember { mutableStateOf(false) }
 
     // 자동 모드 + 화면이 보이는 동안만 공식 SDK 변경 알림을 구독한다.
     // 이전의 HTTP 요청/JSON 처리/250ms 조회 반복문은 더 이상 사용하지 않는다.
     // collect는 메인 스레드에서 실행되어 화면 상태와 음량이 함께 갱신된다.
-    LaunchedEffect(lifecycle, automatic) {
+    LaunchedEffect(lifecycle, automatic, simulateDriving) {
         if (!automatic) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
@@ -77,9 +80,11 @@ fun Screen(lifecycle: Lifecycle) {
                         connectionMessage = snapshot.message
                     }
                     .map { it.signal }
-                val navi = naviClient.observe()
+                val realNavi = naviClient.observe()
+                val navi = (if (simulateDriving) realNavi.withSimulatedDriving() else realNavi)
                     .onEach { naviMessage = it.message }
-                turnCues(signals, navi).collect { cue = it }
+                val speeds = flowOf(if (simulateDriving) SIM_SPEED_MPS else null)
+                turnCues(signals, navi, speeds).collect { cue = it }
             } finally {
                 // 화면을 떠나거나 수동 모드로 전환하면 구독이 취소되고 연결도 정리된다.
                 signal = TurnSignal.CENTER
@@ -109,12 +114,12 @@ fun Screen(lifecycle: Lifecycle) {
     )
 
     // -1(왼쪽)~+1(오른쪽)로 정규화해 실제 재생 음량과 화면 표시를 함께 결정한다.
-    // 가운데(0): 100%/100%, 왼쪽(-1): 80%/20%, 오른쪽(+1): 20%/80%.
+    // 가운데(0): 100%/100%, 왼쪽(-1): 70%/30%, 오른쪽(+1): 30%/70%. (팀 확정 세기 7:3)
     // 전환 중에는 기존 0.8초 애니메이션을 따라 두 채널이 부드럽게 변한다.
     val normalizedBalance = (balance / strength).coerceIn(-1f, 1f)
     val turnAmount = kotlin.math.abs(normalizedBalance)
-    val leftVol = 1f - 0.2f * turnAmount - 0.6f * maxOf(0f, normalizedBalance)
-    val rightVol = 1f - 0.2f * turnAmount - 0.6f * maxOf(0f, -normalizedBalance)
+    val leftVol = 1f - 0.3f * turnAmount - 0.4f * maxOf(0f, normalizedBalance)
+    val rightVol = 1f - 0.3f * turnAmount - 0.4f * maxOf(0f, -normalizedBalance)
 
     // 화면이 바뀔 때마다 실제 플레이어에 볼륨 적용
     SideEffect {
@@ -143,6 +148,10 @@ fun Screen(lifecycle: Lifecycle) {
             // 테스트 확인용: 예고 판단 결과와 내비 정보
             Text("예고: ${cue.mode.label} · 깜빡이 ${signal.label}", fontSize = 18.sp)
             Text(naviMessage, fontSize = 18.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("가상 주행 (테스트)", fontSize = 16.sp)
+                Switch(checked = simulateDriving, onCheckedChange = { simulateDriving = it })
+            }
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(

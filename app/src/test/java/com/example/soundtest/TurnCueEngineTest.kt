@@ -97,20 +97,30 @@ class TurnCueEngineTest {
     }
 
     @Test
-    fun TBT_목록은_정렬하고_거리0과_정보성_항목은_무시() {
+    fun TBT_목록은_경로_순서이고_첫_안내가_다음_회전() {
+        // 에뮬레이터에서 실제로 받은 목록 앞부분 (80m 후 좌회전, 그다음 380m 후 우회전)
         val list = listOf(
-            TBTInfo(TurnType.TURN_RIGHT, 300.0, ""),
-            TBTInfo(TurnType.TURN_TOLL, 0.0, ""),
-            TBTInfo(TurnType.TURN_TUNNEL, 50.0, ""),
-            TBTInfo(TurnType.TURN_LEFT, 120.0, ""),
+            TBTInfo(TurnType.TURN_LEFT, 80.0, ""),
+            TBTInfo(TurnType.TURN_RIGHT, 380.0, ""),
+            TBTInfo(TurnType.TURN_ARRIVE, 20.0, ""),
         )
-        assertEquals(NaviTurn(TurnSignal.LEFT, 120.0), pickNextTurn(list))
+        assertEquals(NaviTurn(TurnSignal.LEFT, 80.0), pickNextTurn(list))
     }
 
     @Test
-    fun 가장_가까운_안내가_직진이나_완만한_회전이면_예고_없음() {
+    fun 정보성_항목은_거리만_더하고_건너뜀() {
+        val list = listOf(
+            TBTInfo(TurnType.TURN_TOLL, 50.0, ""),
+            TBTInfo(TurnType.TURN_RIGHT, 30.0, ""),
+        )
+        assertEquals(NaviTurn(TurnSignal.RIGHT, 80.0), pickNextTurn(list))
+    }
+
+    @Test
+    fun 다음_안내가_직진이나_완만한_회전이면_예고_없음() {
         assertNull(pickNextTurn(listOf(TBTInfo(TurnType.TURN_STRAIGHT, 80.0, ""), TBTInfo(TurnType.TURN_LEFT, 500.0, ""))))
         assertNull(pickNextTurn(listOf(TBTInfo(TurnType.TURN_KEEP_L, 80.0, ""))))
+        assertNull(pickNextTurn(listOf(TBTInfo(TurnType.TURN_ARRIVE, 20.0, ""))))
         assertNull(pickNextTurn(emptyList()))
     }
 }

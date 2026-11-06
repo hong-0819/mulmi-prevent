@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
@@ -154,6 +155,8 @@ internal class TurnCueEngine(
 internal fun turnCues(
     signals: Flow<TurnSignal>,
     navi: Flow<NaviSnapshot>,
+    /** 차 속도(m/s). 아직 실제 속도 입력이 없으면 null 하나만 보내면 된다 → 30m 기준 사용 */
+    speeds: Flow<Double?> = flowOf(null),
     clock: () -> Long = { SystemClock.elapsedRealtime() },
 ): Flow<TurnCue> = channelFlow {
     val engine = TurnCueEngine()
@@ -174,4 +177,5 @@ internal fun turnCues(
     send(TurnCue.IDLE)
     launch { signals.collect { engine.onSignal(it, clock()); publish() } }
     launch { navi.collect { engine.onNavi(it); publish() } }
+    launch { speeds.collect { engine.onSpeed(it); publish() } }
 }.distinctUntilChanged().flowOn(Dispatchers.Main.immediate)
