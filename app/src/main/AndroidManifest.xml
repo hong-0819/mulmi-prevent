@@ -4,6 +4,8 @@
 
     <!-- 차량의 깜빡이와 조명 상태를 읽는 권한 -->
     <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <!-- 내비 안내 정보(다음 회전 방향·거리)를 조회하는 권한 -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
 
     <application
         android:allowBackup="true"

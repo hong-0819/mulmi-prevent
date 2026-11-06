@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +56,10 @@ fun Screen(lifecycle: Lifecycle) {
     var signal by remember { mutableStateOf(TurnSignal.CENTER) }
     var connectionMessage by remember { mutableStateOf("깜빡이 연결 중") }
     val signalClient = remember { PleosTurnSignalClient(context.applicationContext) }
+    // 내비 회전 정보 + 깜빡이를 합쳐 최종 예고 방향을 정한다 (TurnCueEngine.kt)
+    val naviClient = remember { PleosNaviClient(context.applicationContext) }
+    var cue by remember { mutableStateOf(TurnCue.IDLE) }
+    var naviMessage by remember { mutableStateOf("내비 대기") }
 
     // 자동 모드 + 화면이 보이는 동안만 공식 SDK 변경 알림을 구독한다.
     // 이전의 HTTP 요청/JSON 처리/250ms 조회 반복문은 더 이상 사용하지 않는다.
@@ -63,30 +69,37 @@ fun Screen(lifecycle: Lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
                 signal = TurnSignal.CENTER
+                cue = TurnCue.IDLE
                 connectionMessage = "Vehicle SDK 연결 중"
-                signalClient.observe().collect { snapshot ->
-                    signal = snapshot.signal
-                    connectionMessage = snapshot.message
-                }
+                val signals = signalClient.observe()
+                    .onEach { snapshot ->
+                        signal = snapshot.signal
+                        connectionMessage = snapshot.message
+                    }
+                    .map { it.signal }
+                val navi = naviClient.observe()
+                    .onEach { naviMessage = it.message }
+                turnCues(signals, navi).collect { cue = it }
             } finally {
                 // 화면을 떠나거나 수동 모드로 전환하면 구독이 취소되고 연결도 정리된다.
                 signal = TurnSignal.CENTER
+                cue = TurnCue.IDLE
                 connectionMessage = "Vehicle SDK 감시 대기"
+                naviMessage = "내비 대기"
             }
         }
     }
 
-    // 나중에 내비 조건을 결합할 지점이다. 현재는 깜빡이만 사용한다.
-    // 예: 내비 방향 == signal && 남은 거리 <= 기준 거리일 때만 signal 사용.
-    // 여기서 CENTER를 반환하면 기존 직진 버튼과 동일하게 양쪽 100%가 된다.
+    // 자동 모드에서는 깜빡이 원본(signal)이 아니라 예고 판단 결과(cue)로 음량을 정한다.
+    // 회전 예고는 회전 끝날 때까지, 차선변경은 2초만 쏠린다. CENTER면 양쪽 100%.
     val effectiveTarget = if (automatic) {
-        when (signal) {
+        when (cue.direction) {
             TurnSignal.LEFT -> -strength
             TurnSignal.RIGHT -> strength
             TurnSignal.CENTER -> 0f
         }
     } else target
-    val effectiveDirection = if (automatic) signal.label else direction
+    val effectiveDirection = if (automatic) cue.direction.label else direction
 
     // target이 바뀌면 0.8초 동안 부드럽게 따라감
     val balance by animateFloatAsState(
@@ -119,12 +132,18 @@ fun Screen(lifecycle: Lifecycle) {
             Switch(checked = automatic, onCheckedChange = {
                 // 모드 전환 시 이전 수동/자동 방향을 이어받지 않고 가운데부터 시작한다.
                 signal = TurnSignal.CENTER
+                cue = TurnCue.IDLE
                 target = 0f
                 direction = "가운데"
                 automatic = it
             })
         }
         Text(if (automatic) connectionMessage else "수동 버튼 테스트 모드", fontSize = 18.sp)
+        if (automatic) {
+            // 테스트 확인용: 예고 판단 결과와 내비 정보
+            Text("예고: ${cue.mode.label} · 깜빡이 ${signal.label}", fontSize = 18.sp)
+            Text(naviMessage, fontSize = 18.sp)
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "왼쪽 ${(leftVol * 100).roundToInt()}%   |   오른쪽 ${(rightVol * 100).roundToInt()}%",

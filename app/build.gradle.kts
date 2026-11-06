@@ -54,4 +54,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     // 차량의 깜빡이 등 상태 정보를 읽기 위한 Pleos 공식 SDK
     implementation("ai.pleos.playground:Vehicle:2.3.2")
+    // 내비 회전 방향·남은 거리를 받기 위한 Pleos 공식 SDK
+    implementation("ai.pleos.playground:NaviHelper:3.0.5")
 }
