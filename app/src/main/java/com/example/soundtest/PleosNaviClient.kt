@@ -17,10 +17,13 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private const val TAG = "NaviSDK"
+private const val TBT_POLL_INTERVAL_MS = 1_000L
 
 /**
  * TBT 목록에서 "바로 다음 움직임 안내"가 좌/우 회전인지 고른다.
@@ -185,6 +188,15 @@ internal class PleosNaviClient(private val context: Context) {
         } catch (error: Exception) {
             Log.e(TAG, "NaviHelper 초기화 오류", error)
             update { it.copy(active = false, nextTurn = null, message = "내비 연결 실패 · 깜빡이만 사용") }
+        }
+
+        // 내비가 TBT를 "바뀔 때만" 보내거나 아예 먼저 안 보낼 수 있어서, 안내 중일 땐 1초마다 직접 요청한다.
+        // (이 흐름은 메인 스레드에서 돌기 때문에 state를 안전하게 읽을 수 있다)
+        launch {
+            while (isActive) {
+                delay(TBT_POLL_INTERVAL_MS)
+                if (state.active && !stopped) requestTbt()
+            }
         }
 
         awaitClose {
