@@ -40,10 +40,11 @@
 
 > 프로젝트 경로에 한글이 포함되면 빌드가 실패할 수 있습니다.
 
-## 테스트 환경 및 필요한 설정
+## 테스트 환경 및 필요한 설정 (개발에 사용한 에뮬레이터 버전·화면 규격 포함)
 | 항목 | 내용 |
 |---|---|
 | 에뮬레이터 | Pleos Connect v2.1.0 (API 34) |
+| 화면 규격 | 2560 × 1440 px, 160 dpi (mdpi) |
 | 보조 도구 | Pleos Connect Virtual Console (방향지시등·주행 상태 조작) |
 | 사용 SDK | Pleos Vehicle SDK 2.3.2 (방향지시등), Pleos NaviHelper 3.0.5 (회전 안내·경로 상태) |
 | 권한 | `pleos.car.permission.CAR_LIGHTS`, `pleos.car.permission.NAVI_ROUTE`, 포그라운드 서비스(미디어 재생), 알림 |
