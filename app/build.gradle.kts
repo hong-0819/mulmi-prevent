@@ -21,9 +21,10 @@ android {
 
     buildTypes {
         release {
+            // R8 최적화가 kotlin 라이브러리 클래스를 재배치하면서
+            // 실행 시 IllegalAccessError로 앱이 바로 종료되는 문제가 있어 비활성화
             optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                enable = false
             }
         }
     }
