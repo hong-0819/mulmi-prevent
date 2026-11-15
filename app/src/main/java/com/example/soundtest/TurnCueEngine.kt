@@ -48,9 +48,7 @@ internal data class NaviSnapshot(
 internal class TurnCueEngine(
     /** 차선변경 "툭" 유지 시간 */
     private val laneChangeHoldMs: Long = 2_000L,
-    /** 회전 몇 초 전부터 쏠릴지 (속도를 알 때) */
-    private val turnLeadSeconds: Double = 2.0,
-    /** 속도를 모르거나 시속 5km 미만일 때 쓰는 회전 지점 거리 기준 */
+    /** 회전 예고 시작 거리 */
     private val nearTurnMeters: Double = 30.0,
 ) {
     private var signal = TurnSignal.CENTER
@@ -79,7 +77,7 @@ internal class TurnCueEngine(
         navi = snapshot
     }
 
-    /** 차 속도(m/s). 아직 속도 입력이 연결되지 않았으면 null → 거리 기준(30m)을 쓴다. */
+    /** 차 속도(m/s). 속도 입력이 없으면 회전 예고를 시작하지 않는다. */
     fun onSpeed(metersPerSecond: Double?) {
         speedMps = metersPerSecond
     }
@@ -128,12 +126,7 @@ internal class TurnCueEngine(
 
     private fun isTurnImminent(distanceMeters: Double): Boolean {
         val speed = speedMps
-        return if (speed != null && speed >= SLOW_SPEED_MPS) {
-            distanceMeters / speed <= turnLeadSeconds
-        } else {
-            // 속도를 모르거나 정차/저속이면 회전 지점 30m 이내일 때만 (가이드 문제점 5)
-            distanceMeters <= nearTurnMeters
-        }
+        return speed != null && speed >= MIN_TURN_SPEED_MPS && distanceMeters in 0.0..nearTurnMeters
     }
 
     private fun releaseTurn() {
@@ -142,7 +135,7 @@ internal class TurnCueEngine(
     }
 
     private companion object {
-        const val SLOW_SPEED_MPS = 5.0 / 3.6
+        const val MIN_TURN_SPEED_MPS = 10.0 / 3.6
         /** 남은 거리가 이만큼 늘어나면 그 회전을 지나 다음 안내로 넘어간 것으로 본다 */
         const val PASSED_MARGIN_METERS = 50.0
     }
@@ -155,7 +148,7 @@ internal class TurnCueEngine(
 internal fun turnCues(
     signals: Flow<TurnSignal>,
     navi: Flow<NaviSnapshot>,
-    /** 차 속도(m/s). 아직 실제 속도 입력이 없으면 null 하나만 보내면 된다 → 30m 기준 사용 */
+    /** 차 속도(m/s). 속도 입력이 없으면 회전 예고를 시작하지 않는다. */
     speeds: Flow<Double?> = flowOf(null),
     clock: () -> Long = { SystemClock.elapsedRealtime() },
 ): Flow<TurnCue> = channelFlow {

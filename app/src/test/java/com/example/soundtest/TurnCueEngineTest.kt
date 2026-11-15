@@ -26,6 +26,7 @@ class TurnCueEngineTest {
     @Test
     fun 내비_회전과_같은_방향_깜빡이면_회전_예고_유지() {
         val engine = TurnCueEngine()
+        engine.onSpeed(36.0 / 3.6)
         engine.onNavi(naviWithTurn(TurnSignal.RIGHT, 25.0))
         engine.onSignal(TurnSignal.RIGHT, nowMs = 0)
         assertEquals(TurnCue(TurnSignal.RIGHT, CueMode.TURN), engine.evaluate(0))
@@ -40,6 +41,7 @@ class TurnCueEngineTest {
     @Test
     fun 회전이_멀면_차선변경_후_가까워지면_회전_예고() {
         val engine = TurnCueEngine()
+        engine.onSpeed(36.0 / 3.6)
         engine.onNavi(naviWithTurn(TurnSignal.LEFT, 200.0))
         engine.onSignal(TurnSignal.LEFT, nowMs = 0)
         assertEquals(CueMode.LANE_CHANGE, engine.evaluate(0).mode)
@@ -49,14 +51,18 @@ class TurnCueEngineTest {
     }
 
     @Test
-    fun 속도를_알면_2초_기준으로_판단() {
+    fun 속도가_10이상이고_거리가_30이내일_때만_회전_예고() {
         val engine = TurnCueEngine()
-        engine.onSpeed(50 / 3.6) // 약 13.9m/s → 2초면 약 28m
         engine.onSignal(TurnSignal.RIGHT, nowMs = 0)
-        engine.onNavi(naviWithTurn(TurnSignal.RIGHT, 40.0))
-        // 40m ÷ 13.9m/s ≈ 2.9초 → 아직 회전 예고 아님 (차선변경 2초도 끝남)
+        engine.onNavi(naviWithTurn(TurnSignal.RIGHT, 30.1))
+        engine.onSpeed(10.0 / 3.6)
         assertEquals(TurnCue.IDLE, engine.evaluate(2_500))
-        engine.onNavi(naviWithTurn(TurnSignal.RIGHT, 27.0))
+        engine.onNavi(naviWithTurn(TurnSignal.RIGHT, 30.0))
+        engine.onSpeed(null)
+        assertEquals(TurnCue.IDLE, engine.evaluate(2_600))
+        engine.onSpeed(9.9 / 3.6)
+        assertEquals(TurnCue.IDLE, engine.evaluate(2_700))
+        engine.onSpeed(10.0 / 3.6)
         assertEquals(TurnCue(TurnSignal.RIGHT, CueMode.TURN), engine.evaluate(3_000))
     }
 
@@ -78,6 +84,7 @@ class TurnCueEngineTest {
     @Test
     fun 경로_재탐색_중이면_가운데로_멈춤() {
         val engine = TurnCueEngine()
+        engine.onSpeed(36.0 / 3.6)
         engine.onNavi(naviWithTurn(TurnSignal.LEFT, 10.0))
         engine.onSignal(TurnSignal.LEFT, nowMs = 0)
         assertEquals(CueMode.TURN, engine.evaluate(0).mode)
@@ -88,6 +95,7 @@ class TurnCueEngineTest {
     @Test
     fun 다음_안내로_넘어가면_회전_예고_해제() {
         val engine = TurnCueEngine()
+        engine.onSpeed(36.0 / 3.6)
         engine.onNavi(naviWithTurn(TurnSignal.LEFT, 10.0))
         engine.onSignal(TurnSignal.LEFT, nowMs = 0)
         assertEquals(CueMode.TURN, engine.evaluate(0).mode)
